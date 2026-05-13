@@ -1,0 +1,756 @@
+#!/usr/bin/env python3
+"""
+╔══════════════════════════════════════════════════════╗
+║            P O L Y F Y   v 4 . 0                    ║
+║     Advanced Authentication & Verification          ║
+║         "Verify Everything, Trust Nothing"           ║
+╚══════════════════════════════════════════════════════╝
+"""
+
+import os
+import sys
+import time
+import random
+import string
+import hashlib
+import base64
+import json
+import re
+from getpass import getpass
+from datetime import datetime
+
+# ============================================
+# COLOR SYSTEM
+# ============================================
+R = '\033[91m'      # Red
+G = '\033[92m'      # Green
+Y = '\033[93m'      # Yellow
+B = '\033[94m'      # Blue
+M = '\033[95m'      # Magenta
+C = '\033[96m'      # Cyan
+W = '\033[97m'      # White
+DG = '\033[90m'     # Dark Gray
+LR = '\033[38;5;196m'  # Bright Red
+LG = '\033[38;5;46m'   # Bright Green
+LB = '\033[38;5;51m'   # Light Blue
+OR = '\033[38;5;208m'  # Orange
+X = '\033[0m'       # Reset
+BO = '\033[1m'      # Bold
+BL = '\033[5m'      # Blink
+UL = '\033[4m'      # Underline
+
+# ============================================
+# UTILITY
+# ============================================
+def clear():
+    os.system('clear' if os.name != 'nt' else 'cls')
+
+def timestamp():
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+# ============================================
+# ANIMATIONS
+# ============================================
+def matrix_rain(lines=12, speed=0.012):
+    chars = "ABCDEFabcdef0123456789!@#$%^&*()_+-=[]{}|;:',.<>?/`~"
+    for _ in range(lines):
+        color = random.choice([90, 91, 92, 93, 94, 95, 96])
+        line = ''.join(random.choice(chars) for _ in range(55))
+        print(f"\033[38;5;{color}m{line}{X}")
+        time.sleep(speed)
+
+def progress_bar(task="VERIFYING", duration=2, steps=30):
+    print(f"\n{Y}[*] {task}...{X}")
+    for i in range(steps + 1):
+        bar = '█' * i + '░' * (steps - i)
+        percent = int((i / steps) * 100)
+        if percent < 40:
+            color = R
+        elif percent < 70:
+            color = Y
+        elif percent < 95:
+            color = B
+        else:
+            color = G
+        sys.stdout.write(f"\r{color}[{bar}] {percent}%{X}")
+        sys.stdout.flush()
+        time.sleep(duration / steps)
+    print(f"\n{G}[✓] {task} COMPLETE!{X}\n")
+
+def typewriter(text, color=G, speed=0.025):
+    for char in text:
+        sys.stdout.write(f"{color}{char}{X}")
+        sys.stdout.flush()
+        time.sleep(speed)
+    print()
+
+def spinner(seconds=1.2, text="Processing"):
+    frames = ['◜','◝','◞','◟']
+    end = time.time() + seconds
+    while time.time() < end:
+        for frame in frames:
+            sys.stdout.write(f"\r{C}{frame} {text}...{X}")
+            sys.stdout.flush()
+            time.sleep(0.06)
+    sys.stdout.write(f"\r{G}✓ {text} Done!{X}     \n")
+
+def scan_line_animation(text, duration=1.5):
+    print(f"\n{Y}[SCANNING] ", end='')
+    for i in range(len(text) + 2):
+        time.sleep(duration / len(text))
+        sys.stdout.write(f"{C}{text[:i]}{W}|{DG}{text[i:]}{X}")
+        sys.stdout.write("\r" + " " * 60 + "\r")
+        sys.stdout.write(f"{Y}[SCANNING] {C}{text[:i]}{W}|{DG}{text[i:]}{X}")
+    print(f"\n{G}[✓] Scan Complete!{X}")
+    time.sleep(0.2)
+
+def fingerprint_animation():
+    print(f"\n{C}╔════════════════════════════╗")
+    print(f"║    BIOMETRIC SCANNING...   ║")
+    print(f"╚════════════════════════════╝{X}")
+    print(f"{DG}    ╭━━━━━━━━━━━━━━━╮")
+    print(f"    ┃ ░░░░░░░░░░░░░ ┃")
+    for i in range(7):
+        pattern = ''.join(random.choice('▒░█▓ ') for _ in range(15))
+        print(f"    ┃ {C}{pattern}{DG} ┃")
+        time.sleep(0.15)
+    print(f"    ╰━━━━━━━━━━━━━━━╯{X}\n")
+
+def otp_animation():
+    otp = str(random.randint(100000, 999999))
+    print(f"\n{Y}[*] GENERATING OTP...{X}")
+    time.sleep(0.3)
+    print(f"{C}╔══════════════════════╗")
+    print(f"║   YOUR OTP CODE:     ║")
+    for _ in range(2):
+        sys.stdout.write(f"\r║      {BL}{LG}{otp}{X}{C}       ║")
+        sys.stdout.flush()
+        time.sleep(0.5)
+        sys.stdout.write(f"\r║      {otp}       ║")
+        sys.stdout.flush()
+        time.sleep(0.3)
+    print(f"\n{C}║   Expires in 60s      ║")
+    print(f"╚══════════════════════╝{X}\n")
+    return otp
+
+def verify_result(success=True, detail=""):
+    if success:
+        print(f"{G}╔══════════════════════════════════╗")
+        print(f"║   ✅ VERIFICATION PASSED ✅   ║")
+        if detail:
+            print(f"║   {detail:<28}║")
+        print(f"╚══════════════════════════════════╝{X}\n")
+    else:
+        print(f"{R}╔══════════════════════════════════╗")
+        print(f"║   ❌ VERIFICATION FAILED ❌   ║")
+        if detail:
+            print(f"║   {detail:<28}║")
+        print(f"╚══════════════════════════════════╝{X}\n")
+
+def countdown_timer(seconds=3):
+    print()
+    for i in range(seconds, 0, -1):
+        sys.stdout.write(f"\r{LR}{BL}    ⏱  {i}  ⏱{X}")
+        sys.stdout.flush()
+        time.sleep(1)
+    print(f"\r{G}    ▶ EXECUTING!{X}    \n")
+
+# ============================================
+# BANNER
+# ============================================
+def show_banner():
+    clear()
+    print(f"""
+{LR}╔══════════════════════════════════════════════════════════╗
+║                                                          ║
+║  {BO}{W}██████╗  ██████╗ ██╗  ██╗   ██╗███████╗██╗   ██╗{LR}    ║
+║  {BO}{W}██╔══██╗██╔═══██╗██║  ╚██╗ ██╔╝██╔════╝╚██╗ ██╔╝{LR}    ║
+║  {BO}{W}██████╔╝██║   ██║██║   ╚████╔╝ █████╗   ╚████╔╝ {LR}    ║
+║  {BO}{W}██╔═══╝ ██║   ██║██║    ╚██╔╝  ██╔══╝    ╚██╔╝  {LR}    ║
+║  {BO}{W}██║     ╚██████╔╝███████╗██║   ██║        ██║   {LR}    ║
+║  {BO}{W}╚═╝      ╚═════╝ ╚══════╝╚═╝   ╚═╝        ╚═╝   {LR}    ║
+║                                                          ║
+║      {DG}ADVANCED AUTHENTICATION & VERIFICATION v4.0{LR}        ║
+║      {DG}"Verify Everything. Trust Nothing."{LR}                ║
+╚══════════════════════════════════════════════════════════╝{X}
+""")
+
+# ============================================
+# USER DATABASE (Simulated)
+# ============================================
+USERS = {
+    "admin@polyfy.io": {
+        "password_hash": hashlib.sha256("Admin@1234".encode()).hexdigest(),
+        "name": "System Admin",
+        "role": "ROOT",
+        "2fa_enabled": True,
+        "phone": "+91-9999999999"
+    },
+    "user@polyfy.io": {
+        "password_hash": hashlib.sha256("User@5678".encode()).hexdigest(),
+        "name": "Normal User",
+        "role": "USER",
+        "2fa_enabled": False,
+        "phone": "+91-8888888888"
+    }
+}
+
+VERIFICATION_LOGS = []
+SESSIONS = {}
+
+# ============================================
+# LOGGING
+# ============================================
+def log_verify(action, detail, status):
+    VERIFICATION_LOGS.append({
+        "time": timestamp(),
+        "action": action,
+        "detail": detail,
+        "status": status
+    })
+
+# ============================================
+# EMAIL VALIDATOR
+# ============================================
+def validate_email(email):
+    pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
+    return bool(re.match(pattern, email))
+
+# ============================================
+# PASSWORD VALIDATOR
+# ============================================
+def validate_password_strength(password):
+    score = 0
+    feedback = []
+    
+    if len(password) >= 8: score += 1
+    else: feedback.append("Min 8 characters")
+    
+    if len(password) >= 12: score += 1
+    
+    if re.search(r'[A-Z]', password): score += 1
+    else: feedback.append("Add uppercase letter")
+    
+    if re.search(r'[a-z]', password): score += 1
+    else: feedback.append("Add lowercase letter")
+    
+    if re.search(r'\d', password): score += 1
+    else: feedback.append("Add number")
+    
+    if re.search(r'[!@#$%^&*(),.?":{}|<>]', password): score += 1
+    else: feedback.append("Add special character")
+    
+    return score, feedback
+
+def get_password_rating(score):
+    if score <= 2: return R, "WEAK"
+    elif score <= 3: return Y, "FAIR"
+    elif score <= 4: return B, "GOOD"
+    elif score <= 5: return G, "STRONG"
+    else: return LG, "EXCELLENT"
+
+# ============================================
+# OTP GENERATOR
+# ============================================
+def generate_otp():
+    return str(random.randint(100000, 999999))
+
+# ============================================
+# TOKEN GENERATOR
+# ============================================
+def generate_token(user, role):
+    data = f"{user}:{role}:{timestamp()}:{random.randint(10000,99999)}"
+    token = base64.b64encode(data.encode()).decode()
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+    SESSIONS[token_hash] = {
+        "user": user,
+        "role": role,
+        "created": timestamp(),
+        "expires": "1 hour"
+    }
+    return token_hash
+
+# ============================================
+# BIOMETRIC SIMULATION
+# ============================================
+def simulate_biometric():
+    fingerprint_animation()
+    spinner(1.5, "Matching fingerprint patterns")
+    match_score = random.randint(70, 100)
+    
+    if match_score >= 85:
+        print(f"{G}[✓] Biometric Match: {match_score}%{X}")
+        return True
+    else:
+        print(f"{R}[✗] Biometric Match: {match_score}% (Below threshold){X}")
+        return False
+
+# ============================================
+# 2FA VERIFICATION
+# ============================================
+def verify_2fa(user_email):
+    print(f"\n{Y}[*] Initiating 2-Factor Authentication...{X}")
+    time.sleep(0.5)
+    
+    if user_email in USERS and USERS[user_email]["2fa_enabled"]:
+        print(f"{C}[*] 2FA enabled for this account.{X}")
+        print(f"{C}[*] Sending OTP to {USERS[user_email]['phone']}...{X}")
+        time.sleep(0.5)
+        
+        generated_otp = otp_animation()
+        
+        user_otp = input(f"{Y}[?] Enter OTP: {X}").strip()
+        countdown_timer(2)
+        
+        if user_otp == generated_otp:
+            print(f"{G}[✓] 2FA Verification Successful!{X}")
+            log_verify("2FA", user_email, "PASSED")
+            return True
+        else:
+            print(f"{R}[✗] Invalid OTP!{X}")
+            log_verify("2FA", user_email, "FAILED")
+            return False
+    else:
+        print(f"{Y}[*] 2FA not enabled. Skipping...{X}")
+        return True
+
+# ============================================
+# LOGIN VERIFICATION
+# ============================================
+def verify_login():
+    print(f"\n{C}╔════════ LOGIN VERIFICATION ════════╗{X}")
+    
+    email = input(f"{Y}[?] Email: {X}").strip()
+    scan_line_animation(email, 0.8)
+    
+    if not validate_email(email):
+        print(f"{R}[✗] Invalid email format!{X}")
+        log_verify("LOGIN", email, "INVALID_EMAIL")
+        return False
+    
+    password = getpass(f"{Y}[?] Password (hidden): {X}")
+    progress_bar("VERIFYING CREDENTIALS", 1.5, 25)
+    
+    if email in USERS:
+        input_hash = hashlib.sha256(password.encode()).hexdigest()
+        if input_hash == USERS[email]["password_hash"]:
+            print(f"{G}[✓] Password Verified!{X}")
+            
+            # 2FA Check
+            if not verify_2fa(email):
+                verify_result(False, "2FA Failed")
+                return False
+            
+            # Generate Session Token
+            spinner(0.8, "Generating session token")
+            token = generate_token(email, USERS[email]["role"])
+            
+            verify_result(True, f"Welcome {USERS[email]['name']}")
+            print(f"{C}[*] Session Token: {token[:20]}...{X}")
+            print(f"{C}[*] Role: {USERS[email]['role']}{X}")
+            print(f"{C}[*] Expires: 1 hour{X}")
+            
+            log_verify("LOGIN", email, "SUCCESS")
+            return True
+        else:
+            verify_result(False, "Wrong Password")
+            log_verify("LOGIN", email, "WRONG_PASSWORD")
+            return False
+    else:
+        verify_result(False, "User Not Found")
+        log_verify("LOGIN", email, "USER_NOT_FOUND")
+        return False
+
+# ============================================
+# REGISTRATION VERIFICATION
+# ============================================
+def verify_registration():
+    print(f"\n{C}╔═══════ REGISTRATION VERIFICATION ═══════╗{X}")
+    
+    name = input(f"{Y}[?] Full Name: {X}").strip()
+    
+    email = input(f"{Y}[?] Email: {X}").strip()
+    scan_line_animation(email, 0.6)
+    
+    if not validate_email(email):
+        print(f"{R}[✗] Invalid email!{X}")
+        log_verify("REGISTER", email, "INVALID_EMAIL")
+        return
+    
+    if email in USERS:
+        print(f"{R}[✗] Email already registered!{X}")
+        return
+    
+    phone = input(f"{Y}[?] Phone (+91-XXXXXXXXXX): {X}").strip()
+    
+    print(f"\n{Y}[*] Password Requirements:{X}")
+    print(f"{DG}  • Min 8 characters{DG}")
+    print(f"  • Uppercase + Lowercase")
+    print(f"  • Number + Special Char{X}")
+    
+    password = getpass(f"{Y}[?] Password (hidden): {X}")
+    
+    score, feedback = validate_password_strength(password)
+    color, rating = get_password_rating(score)
+    
+    print(f"\n{Y}[*] Password Strength: ", end='')
+    bar = '█' * score + '░' * (6 - score)
+    print(f"{color}[{bar}] {rating}{X}")
+    
+    if feedback:
+        print(f"{Y}[!] Suggestions:{X}")
+        for f in feedback:
+            print(f"  {DG}→ {f}{X}")
+    
+    if score < 3:
+        print(f"\n{R}[✗] Password too weak! Registration denied.{X}")
+        log_verify("REGISTER", email, "WEAK_PASSWORD")
+        return
+    
+    confirm = getpass(f"{Y}[?] Confirm Password (hidden): {X}")
+    
+    if password != confirm:
+        print(f"{R}[✗] Passwords don't match!{X}")
+        return
+    
+    enable_2fa = input(f"{Y}[?] Enable 2FA? (y/n): {X}").strip().lower()
+    
+    progress_bar("REGISTERING USER", 2, 30)
+    
+    # Simulate registration
+    USERS[email] = {
+        "password_hash": hashlib.sha256(password.encode()).hexdigest(),
+        "name": name,
+        "role": "USER",
+        "2fa_enabled": enable_2fa == 'y',
+        "phone": phone
+    }
+    
+    verify_result(True, f"Registered: {name}")
+    print(f"{C}[*] User created successfully!{X}")
+    print(f"{C}[*] 2FA: {'Enabled' if enable_2fa == 'y' else 'Disabled'}{X}")
+    log_verify("REGISTER", email, "SUCCESS")
+
+# ============================================
+# TOKEN VERIFICATION
+# ============================================
+def verify_token():
+    print(f"\n{C}╔════════ TOKEN VERIFICATION ════════╗{X}")
+    
+    token = input(f"{Y}[?] Session Token: {X}").strip()
+    progress_bar("VERIFYING TOKEN", 1.2, 20)
+    
+    if token in SESSIONS:
+        session = SESSIONS[token]
+        verify_result(True, f"Valid Token")
+        print(f"{C}[*] User: {session['user']}{X}")
+        print(f"{C}[*] Role: {session['role']}{X}")
+        print(f"{C}[*] Created: {session['created']}{X}")
+        log_verify("TOKEN", token[:10], "VALID")
+    elif token == "":
+        print(f"{Y}[!] No token provided.{X}")
+    else:
+        verify_result(False, "Invalid/Expired Token")
+        log_verify("TOKEN", token[:10], "INVALID")
+
+# ============================================
+# PASSWORD RESET VERIFICATION
+# ============================================
+def verify_password_reset():
+    print(f"\n{C}╔═══════ PASSWORD RESET ═══════╗{X}")
+    
+    email = input(f"{Y}[?] Registered Email: {X}").strip()
+    scan_line_animation(email, 0.6)
+    
+    if email not in USERS:
+        print(f"{R}[✗] Email not found!{X}")
+        log_verify("RESET", email, "NOT_FOUND")
+        return
+    
+    print(f"{Y}[*] Sending reset OTP to {USERS[email]['phone']}...{X}")
+    time.sleep(0.5)
+    
+    reset_otp = otp_animation()
+    user_otp = input(f"{Y}[?] Enter OTP: {X}").strip()
+    
+    if user_otp != reset_otp:
+        print(f"{R}[✗] Invalid OTP!{X}")
+        log_verify("RESET", email, "OTP_FAILED")
+        return
+    
+    print(f"{G}[✓] OTP Verified!{X}")
+    
+    new_pass = getpass(f"{Y}[?] New Password (hidden): {X}")
+    score, _ = validate_password_strength(new_pass)
+    
+    if score < 3:
+        print(f"{R}[✗] New password too weak!{X}")
+        return
+    
+    confirm = getpass(f"{Y}[?] Confirm Password (hidden): {X}")
+    
+    if new_pass != confirm:
+        print(f"{R}[✗] Passwords don't match!{X}")
+        return
+    
+    progress_bar("RESETTING PASSWORD", 1.5, 25)
+    
+    USERS[email]["password_hash"] = hashlib.sha256(new_pass.encode()).hexdigest()
+    verify_result(True, "Password Reset Complete")
+    log_verify("RESET", email, "SUCCESS")
+
+# ============================================
+# BIOMETRIC VERIFICATION
+# ============================================
+def verify_biometric():
+    print(f"\n{C}╔═════ BIOMETRIC VERIFICATION ═════╗{X}")
+    print(f"{Y}[*] Place finger on scanner...{X}")
+    time.sleep(0.5)
+    
+    result = simulate_biometric()
+    
+    if result:
+        verify_result(True, "Biometric Verified")
+        log_verify("BIOMETRIC", "Fingerprint", "PASSED")
+    else:
+        verify_result(False, "Biometric Mismatch")
+        log_verify("BIOMETRIC", "Fingerprint", "FAILED")
+
+# ============================================
+# MULTI-FACTOR AUTH (ALL AT ONCE)
+# ============================================
+def full_mfa_verification():
+    print(f"\n{LR}{BL}╔════ FULL MFA VERIFICATION ════╗{X}\n")
+    print(f"{Y}[*] Multi-Factor Authentication Required!{X}")
+    time.sleep(0.5)
+    
+    factors_passed = 0
+    
+    # Factor 1: Password
+    print(f"\n{C}[FACTOR 1/3] Something You KNOW{X}")
+    password = getpass(f"{Y}[?] Password: {X}")
+    progress_bar("CHECKING PASSWORD", 1, 15)
+    factor1_ok = True  # Simulated
+    print(f"{G}[✓] Factor 1 Passed!{X}")
+    factors_passed += 1
+    
+    # Factor 2: OTP
+    print(f"\n{C}[FACTOR 2/3] Something You HAVE{X}")
+    otp = otp_animation()
+    user_otp = input(f"{Y}[?] Enter OTP: {X}").strip()
+    if user_otp == otp:
+        print(f"{G}[✓] Factor 2 Passed!{X}")
+        factors_passed += 1
+    else:
+        print(f"{R}[✗] Factor 2 Failed!{X}")
+    
+    # Factor 3: Biometric
+    print(f"\n{C}[FACTOR 3/3] Something You ARE{X}")
+    if simulate_biometric():
+        print(f"{G}[✓] Factor 3 Passed!{X}")
+        factors_passed += 1
+    else:
+        print(f"{R}[✗] Factor 3 Failed!{X}")
+    
+    print(f"\n{LR}╔════ MFA RESULT ════╗")
+    if factors_passed == 3:
+        print(f"║  {G}ALL 3 FACTORS PASSED{LR}  ║")
+        print(f"║  {G}ACCESS GRANTED!{LR}       ║")
+        verify_result(True, "Full MFA Complete")
+    elif factors_passed >= 2:
+        print(f"║  {Y}{factors_passed}/3 FACTORS PASSED{LR}  ║")
+        print(f"║  {Y}PARTIAL ACCESS{LR}          ║")
+        verify_result(True, "Partial MFA (2/3)")
+    else:
+        print(f"║  {R}{factors_passed}/3 FACTORS PASSED{LR}  ║")
+        print(f"║  {R}ACCESS DENIED!{LR}         ║")
+        verify_result(False, "MFA Failed")
+    print(f"{LR}╚══════════════════╝{X}")
+    
+    log_verify("MFA", f"Factors: {factors_passed}/3", "PASSED" if factors_passed >= 2 else "FAILED")
+
+# ============================================
+# VIEW LOGS
+# ============================================
+def view_logs():
+    print(f"\n{C}╔═══════════[ VERIFICATION LOGS ]═══════════╗{X}")
+    if not VERIFICATION_LOGS:
+        print(f"{C}║        No verification logs yet.         ║{X}")
+    else:
+        for log in VERIFICATION_LOGS:
+            s_color = G if 'PASSED' in log['status'] or 'SUCCESS' in log['status'] or 'VALID' in log['status'] else R
+            print(f"{C}║ {DG}{log['time']} {W}{log['action']:<10} {DG}{log['detail']:<20} {s_color}{log['status']:<12}{C}║{X}")
+    print(f"{C}╚═══════════════════════════════════════════╝{X}\n")
+
+# ============================================
+# MENU
+# ============================================
+def show_menu():
+    print(f"""
+{Y}╔══════════════[ POLYFY COMMANDS ]══════════════════╗
+║                                                    ║
+║  {W}01. Login Verification{R} 🔑{Y}                           ║
+║  {W}02. Register New User{R} 📝{Y}                           ║
+║  {W}03. Token Verification{R} 🎫{Y}                           ║
+║  {W}04. Password Reset Verification{R} 🔄{Y}                  ║
+║  {W}05. Biometric Verification{R} 🖐{Y}                       ║
+║  {W}06. Full MFA Verification{R} 🛡️{Y}                       ║
+║  {W}07. Password Strength Checker{R} 📊{Y}                    ║
+║  {W}08. Generate Strong Password{R} 🔐{Y}                     ║
+║  {W}09. Email Validator{R} ✉️{Y}                             ║
+║  {W}10. View Verification Logs{R} 📋{Y}                       ║
+║  {W}11. Clear All Logs{R} 🧹{Y}                              ║
+║                                                    ║
+║  {DG}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{Y}  ║
+║  {W}help  → Show Help                               {Y}║
+║  {W}clear → Clear Screen                            {Y}║
+║  {W}0     → Exit                                    {Y}║
+║                                                    ║
+╚════════════════════════════════════════════════════╝{X}
+""")
+
+# ============================================
+# MAIN
+# ============================================
+def main():
+    show_banner()
+    
+    # Startup
+    print(f"\n{DG}[{timestamp()}] Initializing POLYFY Engine...{X}")
+    time.sleep(0.3)
+    matrix_rain(8, 0.01)
+    typewriter("\n[+] Verification modules loaded.", G, 0.02)
+    typewriter("[+] Authentication database connected.", G, 0.02)
+    typewriter("[+] Biometric scanner online.", G, 0.02)
+    typewriter("[+] OTP service ready.", G, 0.02)
+    print(f"{LR}{BL}\n    🔐 POLYFY ACTIVATED - Verify Everything 🔐{X}\n")
+    time.sleep(0.5)
+    
+    while True:
+        show_menu()
+        
+        try:
+            choice = input(f"{R}[{W}polyfy{R}@{W}verify{R}]~# {G}").strip()
+        except KeyboardInterrupt:
+            print(f"\n\n{R}[!] SESSION TERMINATED!{X}\n")
+            break
+        
+        if choice == '0':
+            print(f"\n{Y}[*] Ending verification session...{X}")
+            spinner(1, "Closing secure connection")
+            print(f"{G}[✓] Session closed. Goodbye!{X}\n")
+            break
+        
+        elif choice == '1':
+            verify_login()
+        
+        elif choice == '2':
+            verify_registration()
+        
+        elif choice == '3':
+            verify_token()
+        
+        elif choice == '4':
+            verify_password_reset()
+        
+        elif choice == '5':
+            verify_biometric()
+        
+        elif choice == '6':
+            full_mfa_verification()
+        
+        elif choice == '7':
+            pwd = getpass(f"{Y}[?] Enter password (hidden): {X}")
+            score, feedback = validate_password_strength(pwd)
+            color, rating = get_password_rating(score)
+            
+            print(f"\n{Y}[*] Password Strength: ", end='')
+            bar = '█' * score + '░' * (6 - score)
+            print(f"{color}[{bar}] {rating}{X}")
+            
+            if feedback:
+                print(f"{Y}[!] Improvements needed:{X}")
+                for f in feedback:
+                    print(f"  {DG}→ {f}{X}")
+            print()
+            log_verify("CHECK", "Password", rating)
+        
+        elif choice == '8':
+            length = int(input(f"{Y}[?] Password length (12-32): {X}") or "16")
+            length = max(12, min(32, length))
+            chars = string.ascii_letters + string.digits + "!@#$%^&*()_+-=[]{}|;:,.<>?"
+            spinner(0.8, "Generating secure password")
+            
+            pwd = ''.join(random.choice(chars) for _ in range(length))
+            # Ensure complexity
+            pwd = (pwd[:4] + random.choice(string.ascii_uppercase) + 
+                   random.choice(string.digits) + 
+                   random.choice("!@#$%^&*") + pwd[7:])
+            
+            print(f"\n{G}╔════ GENERATED PASSWORD ════╗")
+            print(f"║  {pwd}  ║")
+            print(f"╚════════════════════════════╝{X}\n")
+            log_verify("GENERATE", f"Length:{length}", "SUCCESS")
+        
+        elif choice == '9':
+            email = input(f"{Y}[?] Email to validate: {X}").strip()
+            scan_line_animation(email, 0.8)
+            if validate_email(email):
+                verify_result(True, f"{email} is VALID")
+                log_verify("EMAIL", email, "VALID")
+            else:
+                verify_result(False, f"{email} is INVALID")
+                log_verify("EMAIL", email, "INVALID")
+        
+        elif choice == '10':
+            view_logs()
+        
+        elif choice == '11':
+            print(f"{Y}[*] Wiping verification logs...{X}")
+            spinner(1, "Securely erasing")
+            VERIFICATION_LOGS.clear()
+            SESSIONS.clear()
+            print(f"{G}[✓] All logs and sessions cleared.{X}\n")
+        
+        elif choice.lower() == 'help':
+            print(f"""
+{C}╔═══════════════[ POLYFY HELP ]════════════════╗
+║                                               ║
+║  POLYFY v4.0 - Verification Suite             ║
+║                                               ║
+║  MODULES:                                     ║
+║  01. Login        - Email+Pass+2FA+Token      ║
+║  02. Register     - New user with validation  ║
+║  03. Token        - Session token verify      ║
+║  04. Reset        - OTP based password reset  ║
+║  05. Biometric    - Fingerprint simulation    ║
+║  06. Full MFA     - 3-factor authentication   ║
+║  07. Strength     - Password quality check    ║
+║  08. Generate     - Strong password create    ║
+║  09. Email        - Email format validation   ║
+║  10. Logs         - View verification history ║
+║  11. Clear        - Wipe all data             ║
+║                                               ║
+║  PRE-LOADED USERS:                            ║
+║  • admin@polyfy.io / Admin@1234               ║
+║  • user@polyfy.io  / User@5678                ║
+║                                               ║
+╚═══════════════════════════════════════════════╝{X}
+""")
+        
+        elif choice.lower() == 'clear':
+            show_banner()
+        
+        else:
+            print(f"{R}[✗] Unknown command! Type 'help'{X}\n")
+
+# ============================================
+# RUN
+# ============================================
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print(f"\n\n{R}[!] FORCE QUIT - Session ended.{X}\n")
+    except Exception as e:
+        print(f"\n{R}[!] CRITICAL ERROR: {e}{X}\n")
